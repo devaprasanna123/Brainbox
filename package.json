@@ -1,0 +1,21 @@
+{
+  "name": "brain-box-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Brain Box AI — Conversational Automation Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @brain-box-ai/web\" \"npm run dev -w @brain-box-ai/api\" \"npm run dev -w @brain-box-ai/worker\"",
+    "build": "npm run build --workspaces --if-present",
+    "test": "node scripts/run_tests.js",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  }
+}

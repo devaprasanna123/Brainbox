@@ -1,0 +1,17 @@
+{
+  "name": "@brain-box-ai/voice",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@brain-box-ai/integrations",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "googleapis": "^137.0.0",
+    "@brain-box-ai/database": "*",
+    "@brain-box-ai/auth": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@brain-box-ai/workflow-engine",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brain-box-ai/database": "*",
+    "@brain-box-ai/integrations": "*",
+    "@brain-box-ai/ai": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
