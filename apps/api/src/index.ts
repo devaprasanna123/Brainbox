@@ -425,14 +425,9 @@ app.post("/api/chat", authenticateToken, async (req: AuthenticatedRequest, res) 
 
       res.write(`data: ${JSON.stringify({ type: "message:start" })}\n\n`);
 
-      // Stream tokens in real time directly as they arrive from LLM provider
-      const response = await provider.streamChat(context, (chunk: string) => {
-        if (!res.writableEnded) {
-          res.write(`data: ${JSON.stringify({ type: "message:delta", content: chunk })}\n\n`);
-        }
-      });
+      const response = await provider.chat(context);
 
-      // Execute Tool Calls in parallel if multiple independent tools requested
+      // Execute Tool Calls
       const executedToolResults: any[] = [];
       if (response.toolCalls && response.toolCalls.length > 0) {
         const toolPromises = response.toolCalls.map(async (call: any) => {
@@ -440,81 +435,36 @@ app.post("/api/chat", authenticateToken, async (req: AuthenticatedRequest, res) 
             res.write(`data: ${JSON.stringify({ type: "tool:start", tool: call.tool })}\n\n`);
           }
           log("ACTION_EXECUTE", { userId, tool: call.tool });
-
           try {
             const result = await executeTool(call, workspaceId, userId, workspaceId);
             const status = (result && (result.status === "failed" || result.error || result.success === false)) ? "failed" : "success";
-            if (!res.writableEnded) {
-              res.write(
-                `data: ${JSON.stringify({ type: status === "success" ? "tool:complete" : "tool:failed", tool: call.tool, result })}\n\n`
-              );
-            }
             return { tool: call.tool, status, result };
           } catch (toolErr: any) {
             log("ACTION_FAILED", { userId, tool: call.tool, error: toolErr.message });
-            if (!res.writableEnded) {
-              res.write(
-                `data: ${JSON.stringify({ type: "tool:failed", tool: call.tool, error: toolErr.message })}\n\n`
-              );
-            }
             return { tool: call.tool, status: "failed", error: { message: toolErr.message } };
           }
         });
-        const toolResults = await Promise.all(toolPromises);
-        executedToolResults.push(...toolResults);
+        executedToolResults.push(...(await Promise.all(toolPromises)));
       }
 
       let finalContent = response.content || "";
       if (executedToolResults.length > 0) {
-        const gmailSendRes = executedToolResults.find((r) => r.tool === "gmail.send");
-        if (gmailSendRes) {
-          if (gmailSendRes.result?.success || gmailSendRes.status === "success" || gmailSendRes.result?.status === "sent") {
-            const recipient = gmailSendRes.result?.to || "recipient";
-            const msgIdStr = gmailSendRes.result?.messageId ? ` (Message ID: ${gmailSendRes.result.messageId})` : "";
-            finalContent = `Done — email sent successfully to ${recipient}.${msgIdStr}`;
-          } else if (gmailSendRes.status === "failed" || gmailSendRes.result?.success === false) {
-            const errObj = gmailSendRes.result?.error || gmailSendRes.error;
-            if (
-              errObj?.code === "GOOGLE_SCOPE_MISSING" ||
-              errObj?.code === "GOOGLE_NOT_CONNECTED" ||
-              errObj?.code === "GOOGLE_AUTH_EXPIRED" ||
-              errObj?.code === "GOOGLE_REAUTH_REQUIRED"
-            ) {
-              finalContent = "I couldn't send the email because Google authorization needs to be reconnected. Please reconnect Google in Settings.";
-            } else if (errObj?.code === "GOOGLE_API_DISABLED" || errObj?.code === "GMAIL_API_DISABLED") {
-              finalContent = "I couldn't send the email because Gmail API is not enabled in your Google Cloud Console project.";
-            } else {
-              const errMsg = errObj?.message || "Google service request failed.";
-              finalContent = `I couldn't send the email because: ${errMsg}`;
-            }
+        const toolResultContext = {
+          ...context,
+          recentMessages: [
+            ...context.recentMessages,
+            { role: "assistant", content: JSON.stringify({ toolCalls: response.toolCalls }) },
+            { role: "system", content: `Tool execution results:\n${JSON.stringify(executedToolResults, null, 2)}\n\nGenerate the final response to the user based ONLY on these actual tool results. Do NOT fabricate success if the tool failed.` }
+          ]
+        };
+        const finalResponse = await provider.streamChat(toolResultContext, (chunk: string) => {
+          if (!res.writableEnded) {
+            res.write(`data: ${JSON.stringify({ type: "message:delta", content: chunk })}\n\n`);
           }
-        }
-
-        const calCreateRes = executedToolResults.find((r) => r.tool === "calendar.create");
-        if (calCreateRes) {
-          if (calCreateRes.result?.success || calCreateRes.status === "success") {
-            const eventTitle = calCreateRes.result?.summary || "event";
-            const eventIdStr = calCreateRes.result?.eventId ? ` (Event ID: ${calCreateRes.result.eventId})` : "";
-            finalContent = `Done — the "${eventTitle}" event was added to your Google Calendar.${eventIdStr}`;
-          } else if (calCreateRes.status === "failed" || calCreateRes.result?.success === false) {
-            const errObj = calCreateRes.result?.error || calCreateRes.error;
-            if (
-              errObj?.code === "GOOGLE_REAUTH_REQUIRED" ||
-              errObj?.code === "GOOGLE_AUTH_EXPIRED"
-            ) {
-              finalContent = "I couldn't create the event because Google authorization needs to be reconnected. Please reconnect Google in Settings.";
-            } else if (errObj?.code === "GOOGLE_API_DISABLED") {
-              finalContent = "I couldn't create the event because Google Calendar API is not enabled in your Google Cloud Console project.";
-            } else {
-              const errMsg = errObj?.message || "Google Calendar API request failed.";
-              finalContent = `I couldn't create the calendar event because: ${errMsg}`;
-            }
-          }
-        }
-      }
-
-      if (finalContent.trim().startsWith("{") && finalContent.includes("toolCalls")) {
-        finalContent = executedToolResults.length > 0 ? "Action executed." : "";
+        });
+        finalContent = finalResponse.content || "";
+      } else {
+        res.write(`data: ${JSON.stringify({ type: "message:delta", content: finalContent })}\n\n`);
       }
 
       // Persist assistant message
@@ -528,49 +478,35 @@ app.post("/api/chat", authenticateToken, async (req: AuthenticatedRequest, res) 
           metadata: {
             toolCalls: response.toolCalls || [],
             toolResults: executedToolResults,
-            clarification: response.needsClarification
-              ? { question: response.question }
-              : undefined,
+            clarification: response.needsClarification ? { question: response.question } : undefined,
           },
         })
         .select()
         .single();
 
       log("CHAT_RESPONSE_SAVED", { userId, conversationId, messageId: assistantMessage?.id });
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: "message:complete", message: assistantMessage })}\n\n`);
+        res.end();
+      }
 
-      res.write(
-        `data: ${JSON.stringify({ type: "message:complete", message: assistantMessage })}\n\n`
-      );
-      res.end();
-
-      // Post-response (Async background execution)
       (async () => {
         if (recentMessages.length <= 3) {
           try {
             const titleGen = await provider.chat({
               recentMessages: [
-                {
-                  role: "system",
-                  content:
-                    "Generate a concise 2-4 word title for this conversation. Respond with ONLY the title text, no quotes.",
-                },
+                { role: "system", content: "Generate a concise 2-4 word title for this conversation. Respond with ONLY the title text, no quotes." },
                 { role: "user", content },
               ],
             });
             const title = titleGen.content.replace(/[\"']/g, "").trim().slice(0, 60);
             if (title) {
-              await supabaseAdmin
-                .from("Conversation")
-                .update({ title, updatedAt: new Date().toISOString() })
-                .eq("id", conversationId);
+              await supabaseAdmin.from("Conversation").update({ title, updatedAt: new Date().toISOString() }).eq("id", conversationId);
             }
           } catch (e) {}
         }
-        try {
-          await extractAndSaveMemory(provider, content, workspaceId, conversationId, userId);
-        } catch (e) {}
+        try { await extractAndSaveMemory(provider, content, workspaceId, conversationId, userId); } catch (e) {}
       })();
-
     } else {
       // ---- Non-SSE Mode ----
       const response = await provider.chat(context);
@@ -588,62 +524,24 @@ app.post("/api/chat", authenticateToken, async (req: AuthenticatedRequest, res) 
             return { tool: call.tool, status: "failed", error: { message: e.message } };
           }
         });
-        const toolResults = await Promise.all(toolPromises);
-        executedToolResults.push(...toolResults);
+        executedToolResults.push(...(await Promise.all(toolPromises)));
       }
 
       let finalContent = response.content || "";
       if (executedToolResults.length > 0) {
-        const gmailSendRes = executedToolResults.find((r) => r.tool === "gmail.send");
-        if (gmailSendRes) {
-          if (gmailSendRes.result?.success || gmailSendRes.status === "success" || gmailSendRes.result?.status === "sent") {
-            const recipient = gmailSendRes.result?.to || "recipient";
-            const msgIdStr = gmailSendRes.result?.messageId ? ` (Message ID: ${gmailSendRes.result.messageId})` : "";
-            finalContent = `Done — the email was sent successfully to ${recipient}.${msgIdStr}`;
-          } else if (gmailSendRes.status === "failed" || gmailSendRes.result?.success === false) {
-            const errObj = gmailSendRes.result?.error || gmailSendRes.result || gmailSendRes.error;
-            if (
-              errObj?.code === "GOOGLE_SCOPE_MISSING" ||
-              errObj?.code === "GOOGLE_NOT_CONNECTED" ||
-              errObj?.code === "GOOGLE_AUTH_EXPIRED" ||
-              errObj?.code === "GOOGLE_REAUTH_REQUIRED"
-            ) {
-              finalContent = "I couldn't send the email because Google authorization needs to be reconnected. Please reconnect Google in Settings.";
-            } else if (errObj?.code === "GOOGLE_API_DISABLED" || errObj?.code === "GMAIL_API_DISABLED" || errObj?.errorCode === "GOOGLE_API_DISABLED") {
-              finalContent = "I couldn't send the email because Gmail API is not enabled in your Google Cloud Console project.";
-            } else {
-              const errMsg = errObj?.message || "Google service request failed.";
-              finalContent = `I couldn't send the email because: ${errMsg}`;
-            }
-          }
-        }
-
-        const calCreateRes = executedToolResults.find((r) => r.tool === "calendar.create");
-        if (calCreateRes) {
-          if (calCreateRes.result?.success || calCreateRes.status === "success") {
-            const eventTitle = calCreateRes.result?.summary || "event";
-            const eventIdStr = calCreateRes.result?.eventId ? ` (Event ID: ${calCreateRes.result.eventId})` : "";
-            finalContent = `Done — the "${eventTitle}" event was added to your Google Calendar.${eventIdStr}`;
-          } else if (calCreateRes.status === "failed" || calCreateRes.result?.success === false) {
-            const errObj = calCreateRes.result?.error || calCreateRes.result || calCreateRes.error;
-            if (
-              errObj?.code === "GOOGLE_REAUTH_REQUIRED" ||
-              errObj?.code === "GOOGLE_AUTH_EXPIRED"
-            ) {
-              finalContent = "I couldn't create the event because Google authorization needs to be reconnected. Please reconnect Google in Settings.";
-            } else if (errObj?.code === "GOOGLE_API_DISABLED" || errObj?.errorCode === "GOOGLE_API_DISABLED") {
-              finalContent = "I couldn't create the event because Google Calendar API is not enabled in your Google Cloud Console project.";
-            } else {
-              const errMsg = errObj?.message || "Google Calendar API request failed.";
-              finalContent = `I couldn't create the calendar event because: ${errMsg}`;
-            }
-          }
-        }
+        const toolResultContext = {
+          ...context,
+          recentMessages: [
+            ...context.recentMessages,
+            { role: "assistant", content: JSON.stringify({ toolCalls: response.toolCalls }) },
+            { role: "system", content: `Tool execution results:\n${JSON.stringify(executedToolResults, null, 2)}\n\nGenerate the final response to the user based ONLY on these actual tool results. Do NOT fabricate success if the tool failed.` }
+          ]
+        };
+        const finalResponse = await provider.chat(toolResultContext);
+        finalContent = finalResponse.content || "";
       }
 
-      if (finalContent.trim().startsWith("{") && finalContent.includes("toolCalls")) {
-        finalContent = executedToolResults.length > 0 ? "Action executed." : "";
-      }
+
 
       const { data: assistantMessage } = await supabaseAdmin
         .from("Message")

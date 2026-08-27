@@ -1,16 +1,14 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AiSummaryArgsSchema = exports.TelegramSendArgsSchema = exports.DiscordSendArgsSchema = exports.SlackSendArgsSchema = exports.GmailSendArgsSchema = exports.CalendarCreateArgsSchema = exports.RegisterSchema = exports.LoginSchema = exports.UserPreferenceSchema = void 0;
-exports.isPrivateIp = isPrivateIp;
-exports.validateUrlForSsrf = validateUrlForSsrf;
+exports.AiSummaryArgsSchema = exports.TelegramSendArgsSchema = exports.DiscordSendArgsSchema = exports.SlackSendArgsSchema = exports.GmailSendArgsSchema = exports.CalendarCreateArgsSchema = exports.RegisterSchema = exports.LoginSchema = exports.UserPreferenceSchema = exports.DEFAULT_TIMEZONE = void 0;
+exports.formatTimezoneDisplay = formatTimezoneDisplay;
+exports.getCurrentTimeInTimezone = getCurrentTimeInTimezone;
 const zod_1 = require("zod");
+exports.DEFAULT_TIMEZONE = "Asia/Kolkata";
 // --- Validation Schemas ---
 exports.UserPreferenceSchema = zod_1.z.object({
     theme: zod_1.z.enum(["system", "light", "dark"]).default("system"),
-    timezone: zod_1.z.string().default("UTC"),
+    timezone: zod_1.z.string().default(exports.DEFAULT_TIMEZONE),
     voiceInput: zod_1.z.boolean().default(true),
     voiceAutoSend: zod_1.z.boolean().default(false),
     voiceResponse: zod_1.z.boolean().default(false),
@@ -55,48 +53,21 @@ exports.AiSummaryArgsSchema = zod_1.z.object({
     text: zod_1.z.string(),
     prompt: zod_1.z.string().optional(), // custom summary instructions
 });
-// --- SSRF Protection Utilities ---
-const dns_1 = __importDefault(require("dns"));
-function isPrivateIp(ip) {
-    if (ip === "127.0.0.1" || ip === "0.0.0.0" || ip === "localhost")
-        return true;
-    const parts = ip.split(".");
-    if (parts.length === 4) {
-        const first = parseInt(parts[0], 10);
-        const second = parseInt(parts[1], 10);
-        if (first === 10)
-            return true;
-        if (first === 172 && (second >= 16 && second <= 31))
-            return true;
-        if (first === 192 && second === 168)
-            return true;
-        if (first === 169 && second === 254)
-            return true; // Link-local
-    }
-    if (ip === "::1" || ip === "::" || ip.startsWith("fe80:") || ip.startsWith("fc00:") || ip.startsWith("fd00:")) {
-        return true;
-    }
-    return false;
-}
-async function validateUrlForSsrf(urlStr) {
+// --- Timezone Utilities ---
+function formatTimezoneDisplay(tz) {
     try {
-        const parsedUrl = new URL(urlStr);
-        const hostname = parsedUrl.hostname;
-        if (isPrivateIp(hostname))
-            return false;
-        return new Promise((resolve) => {
-            dns_1.default.lookup(hostname, (err, address) => {
-                if (err) {
-                    resolve(false);
-                }
-                else {
-                    resolve(!isPrivateIp(address));
-                }
-            });
-        });
+        const format = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" });
+        const parts = format.formatToParts(new Date());
+        const offset = parts.find(p => p.type === "timeZoneName")?.value || "";
+        return `${tz} (${offset})`;
     }
-    catch {
-        return false;
+    catch (e) {
+        return `${tz}`;
     }
+}
+function getCurrentTimeInTimezone(tz = exports.DEFAULT_TIMEZONE) {
+    const date = new Date();
+    const str = date.toLocaleString("en-US", { timeZone: tz });
+    return new Date(str);
 }
 //# sourceMappingURL=index.js.map

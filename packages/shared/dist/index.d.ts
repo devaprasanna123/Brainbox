@@ -1,4 +1,5 @@
 import { z } from "zod";
+export declare const DEFAULT_TIMEZONE = "Asia/Kolkata";
 export type UserRole = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 export type MessageRole = "USER" | "ASSISTANT" | "SYSTEM" | "TOOL";
 export type MessageType = "TEXT" | "VOICE" | "IMAGE" | "FILE" | "TOOL_CALL" | "TOOL_RESULT" | "WORKFLOW" | "APPROVAL" | "SYSTEM" | "ERROR";
@@ -148,5 +149,5 @@ export declare const AiSummaryArgsSchema: z.ZodObject<{
     text: string;
     prompt?: string | undefined;
 }>;
-export declare function isPrivateIp(ip: string): boolean;
-export declare function validateUrlForSsrf(urlStr: string): Promise<boolean>;
+export declare function formatTimezoneDisplay(tz: string): string;
+export declare function getCurrentTimeInTimezone(tz?: string): Date;

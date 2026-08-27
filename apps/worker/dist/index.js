@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,7 +45,7 @@ dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), "../../.en
 const database_1 = require("@brain-box-ai/database");
 const workflow_engine_1 = require("@brain-box-ai/workflow-engine");
 const bullmq_1 = require("bullmq");
-const cron_parser_1 = __importDefault(require("cron-parser"));
+const cronParser = __importStar(require("cron-parser"));
 const REDIS_URL = process.env.REDIS_URL;
 const USE_REDIS = !!REDIS_URL && REDIS_URL.trim() !== "";
 console.log(`🤖 Starting Brain Box AI Worker...`);
@@ -157,14 +190,13 @@ async function pollSchedules() {
         console.error("Error polling schedules:", e);
     }
 }
-// Helper to compute next run time from cron and timezone
-function calculateNextRun(cronExpression, timezone = "UTC") {
+function calculateNextRun(cronExpression, timezone = "Asia/Kolkata") {
     try {
         const options = {
             currentDate: new Date(),
             tz: timezone,
         };
-        const interval = cron_parser_1.default.parseExpression(cronExpression, options);
+        const interval = cronParser.CronExpressionParser.parse(cronExpression, options);
         return interval.next().toDate();
     }
     catch (err) {

@@ -326,6 +326,7 @@ export default function ChatPage() {
         } catch {} finally {
           setIsThinking(false);
           isSubmittingRef.current = false;
+          voiceStateRef.current = "IDLE";
         }
       } else {
         const wakeMsg: Message = {
@@ -337,6 +338,7 @@ export default function ChatPage() {
         };
         setMessages([wakeMsg]);
         isSubmittingRef.current = false;
+        voiceStateRef.current = "IDLE";
       }
       setTimeout(() => inputRef.current?.focus(), 100);
       return;
@@ -358,6 +360,8 @@ export default function ChatPage() {
       currentConvId = await handleCreateConversation();
       if (!currentConvId) {
         setIsThinking(false);
+        isSubmittingRef.current = false;
+        voiceStateRef.current = "IDLE";
         setMessages((prev) => [
           ...prev,
           {
@@ -1340,8 +1344,18 @@ export default function ChatPage() {
             <button
               type="button"
               disabled={isThinking}
-              onClick={toggleRecording}
-              className={`p-3 rounded-xl transition ${
+              onPointerDown={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onPointerUp={(e) => {
+                e.preventDefault();
+                if (isRecording) stopRecording(true);
+              }}
+              onPointerLeave={(e) => {
+                if (isRecording) stopRecording(true);
+              }}
+              className={`p-3 rounded-xl transition select-none ${
                 isRecording
                   ? "bg-red-500 text-white animate-pulse"
                   : isThinking
@@ -1349,7 +1363,7 @@ export default function ChatPage() {
                   : "text-slate-400 hover:text-white hover:bg-slate-800"
               }`}
             >
-              {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              {isRecording ? <MicOff className="w-5 h-5 pointer-events-none" /> : <Mic className="w-5 h-5 pointer-events-none" />}
             </button>
 
             <input

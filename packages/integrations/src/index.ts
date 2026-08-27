@@ -36,38 +36,25 @@ export function safeLog(event: string, meta: Record<string, unknown> = {}) {
 // ============================================================
 // OAUTH STATE STORE (server-side CSRF protection)
 // ============================================================
-interface OAuthStateEntry {
-  userId: string;
-  workspaceId: string;
-  createdAt: number;
-}
-const oauthStateStore = new Map<string, OAuthStateEntry>();
-const OAUTH_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+import jwt from "jsonwebtoken";
+
+const OAUTH_STATE_SECRET = process.env.AUTH_SECRET || "fallback_oauth_secret_for_state_signing_only";
 
 export function generateOAuthState(userId: string, workspaceId: string): string {
-  const now = Date.now();
-  for (const [k, v] of oauthStateStore.entries()) {
-    if (now - v.createdAt > OAUTH_STATE_TTL_MS) {
-      oauthStateStore.delete(k);
-    }
-  }
-  const state = crypto.randomBytes(32).toString("hex");
-  oauthStateStore.set(state, { userId, workspaceId, createdAt: now });
+  const payload = { userId, workspaceId };
+  const state = jwt.sign(payload, OAUTH_STATE_SECRET, { expiresIn: "1h" });
   safeLog("GOOGLE_OAUTH_START", { userId, workspaceId });
   return state;
 }
 
 export function consumeOAuthState(state: string): { userId: string; workspaceId: string } {
   if (!state) throw new Error("Missing OAuth state parameter.");
-  const entry = oauthStateStore.get(state);
-  if (!entry) throw new Error("Invalid or already-used OAuth state.");
-  const age = Date.now() - entry.createdAt;
-  if (age > OAUTH_STATE_TTL_MS) {
-    oauthStateStore.delete(state);
-    throw new Error("OAuth state has expired. Please try connecting again.");
+  try {
+    const decoded = jwt.verify(state, OAUTH_STATE_SECRET) as any;
+    return { userId: decoded.userId, workspaceId: decoded.workspaceId };
+  } catch (err) {
+    throw new Error("OAuth state has expired or is invalid. Please try connecting again.");
   }
-  oauthStateStore.delete(state);
-  return { userId: entry.userId, workspaceId: entry.workspaceId };
 }
 
 // ============================================================
@@ -1104,21 +1091,37 @@ export class CalendarProvider {
       const auth = await getAuthorizedClient(this.userId);
       const calendar = google.calendar({ version: "v3", auth });
 
-      const start = new Date(startTime);
-      const end = new Date(start.getTime() + durationMinutes * 60000);
+      let startISO = startTime;
+      if (!startTime.includes("T")) {
+        startISO = new Date(startTime).toISOString();
+      } else if (startTime.endsWith("Z")) {
+        // AI generated a UTC time explicitly
+      } else if (!startTime.includes("+") && !startTime.includes("-", 11)) {
+        // AI generated a local time without offset (e.g., YYYY-MM-DDTHH:MM:SS)
+        // We pass it directly to Google Calendar, which uses the timeZone field
+      }
 
-      const startISO = startTime.includes("T") && (startTime.includes("+") || startTime.includes("Z"))
-        ? startTime
-        : start.toISOString();
-      const endISO = end.toISOString();
+      const startMs = new Date(startISO).getTime();
+      const endMs = startMs + durationMinutes * 60000;
+      const endISO = new Date(endMs).toISOString(); // End time offset doesn't strictly matter if we just use the ms offset, but it's safer to format the same way.
+
+      // Actually, if startISO lacks an offset, new Date(startISO) assumes local time on Vercel (UTC).
+      // So let's build end time by modifying the string or just use Date object.
+      // A better approach is to let Google Calendar handle the `timeZone`.
+      const startDateTimeObj = { dateTime: startISO, timeZone: userTimezone };
+      const endDateTimeObj = { dateTime: new Date(new Date(startISO).getTime() + durationMinutes * 60000).toISOString(), timeZone: userTimezone };
+      if (!startISO.includes("Z") && !startISO.includes("+") && !startISO.includes("-", 11)) {
+         const endD = new Date(new Date(startISO + "Z").getTime() + durationMinutes * 60000);
+         endDateTimeObj.dateTime = endD.toISOString().replace(".000Z", "").replace("Z", "");
+      }
 
       const event = await calendar.events.insert({
         calendarId: "primary",
         requestBody: {
           summary: title,
           description: description || `Created by Brain Box AI (${title})`,
-          start: { dateTime: startISO, timeZone: userTimezone },
-          end: { dateTime: endISO, timeZone: userTimezone },
+          start: startDateTimeObj,
+          end: endDateTimeObj,
         },
       });
 

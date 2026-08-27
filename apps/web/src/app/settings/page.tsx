@@ -20,6 +20,7 @@ import {
   Link as LinkIcon
 } from "lucide-react";
 import Link from "next/link";
+import { formatTimezoneDisplay, DEFAULT_TIMEZONE } from "@brain-box-ai/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -28,7 +29,7 @@ export default function SettingsPage() {
 
   const [preferences, setPreferences] = useState({
     theme: "system",
-    timezone: "UTC",
+    timezone: DEFAULT_TIMEZONE,
     voiceInput: true,
     voiceAutoSend: false,
     voiceResponse: false,
@@ -230,11 +231,9 @@ export default function SettingsPage() {
                   onChange={(e) => handlePreferenceChange("timezone", e.target.value)}
                   className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="Asia/Kolkata">Asia/Kolkata (IST +05:30)</option>
-                  <option value="UTC">UTC (+00:00)</option>
-                  <option value="America/New_York">America/New_York (EST -05:00)</option>
-                  <option value="America/Los_Angeles">America/Los_Angeles (PST -08:00)</option>
-                  <option value="Europe/London">Europe/London (GMT +00:00)</option>
+                  {["Asia/Kolkata", "UTC", "America/New_York", "America/Los_Angeles", "Europe/London"].map((tz) => (
+                    <option key={tz} value={tz}>{formatTimezoneDisplay(tz)}</option>
+                  ))}
                 </select>
               </div>
 

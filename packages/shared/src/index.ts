@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const DEFAULT_TIMEZONE = "Asia/Kolkata";
+
 // --- Enums ---
 export type UserRole = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 export type MessageRole = "USER" | "ASSISTANT" | "SYSTEM" | "TOOL";
@@ -21,7 +23,7 @@ export type ExecutionStatus = "RUNNING" | "SUCCESS" | "FAILED" | "WAITING" | "CA
 // --- Validation Schemas ---
 export const UserPreferenceSchema = z.object({
   theme: z.enum(["system", "light", "dark"]).default("system"),
-  timezone: z.string().default("UTC"),
+  timezone: z.string().default(DEFAULT_TIMEZONE),
   voiceInput: z.boolean().default(true),
   voiceAutoSend: z.boolean().default(false),
   voiceResponse: z.boolean().default(false),
@@ -101,47 +103,24 @@ export const AiSummaryArgsSchema = z.object({
   prompt: z.string().optional(), // custom summary instructions
 });
 
-// --- SSRF Protection Utilities ---
-import dns from "dns";
 
-export function isPrivateIp(ip: string): boolean {
-  if (ip === "127.0.0.1" || ip === "0.0.0.0" || ip === "localhost") return true;
-  
-  const parts = ip.split(".");
-  if (parts.length === 4) {
-    const first = parseInt(parts[0], 10);
-    const second = parseInt(parts[1], 10);
-    if (first === 10) return true;
-    if (first === 172 && (second >= 16 && second <= 31)) return true;
-    if (first === 192 && second === 168) return true;
-    if (first === 169 && second === 254) return true; // Link-local
+
+// --- Timezone Utilities ---
+
+export function formatTimezoneDisplay(tz: string): string {
+  try {
+    const format = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" });
+    const parts = format.formatToParts(new Date());
+    const offset = parts.find(p => p.type === "timeZoneName")?.value || "";
+    return `${tz} (${offset})`;
+  } catch (e) {
+    return `${tz}`;
   }
-  
-  if (ip === "::1" || ip === "::" || ip.startsWith("fe80:") || ip.startsWith("fc00:") || ip.startsWith("fd00:")) {
-    return true;
-  }
-  
-  return false;
 }
 
-export async function validateUrlForSsrf(urlStr: string): Promise<boolean> {
-  try {
-    const parsedUrl = new URL(urlStr);
-    const hostname = parsedUrl.hostname;
-    
-    if (isPrivateIp(hostname)) return false;
-    
-    return new Promise((resolve) => {
-      dns.lookup(hostname, (err, address) => {
-        if (err) {
-          resolve(false);
-        } else {
-          resolve(!isPrivateIp(address));
-        }
-      });
-    });
-  } catch {
-    return false;
-  }
+export function getCurrentTimeInTimezone(tz: string = DEFAULT_TIMEZONE): Date {
+  const date = new Date();
+  const str = date.toLocaleString("en-US", { timeZone: tz });
+  return new Date(str);
 }
 

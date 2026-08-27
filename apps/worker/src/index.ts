@@ -6,7 +6,7 @@ dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 import { supabaseAdmin } from "@brain-box-ai/database";
 import { WorkflowExecutor } from "@brain-box-ai/workflow-engine";
 import { Queue, Worker, Job } from "bullmq";
-import cronParser from "cron-parser";
+import * as cronParser from "cron-parser";
 
 const REDIS_URL = process.env.REDIS_URL;
 const USE_REDIS = !!REDIS_URL && REDIS_URL.trim() !== "";
@@ -185,14 +185,13 @@ async function pollSchedules() {
   }
 }
 
-// Helper to compute next run time from cron and timezone
-export function calculateNextRun(cronExpression: string, timezone: string = "UTC"): Date {
+export function calculateNextRun(cronExpression: string, timezone: string = "Asia/Kolkata"): Date {
   try {
     const options = {
       currentDate: new Date(),
       tz: timezone,
     };
-    const interval = cronParser.parseExpression(cronExpression, options);
+    const interval = cronParser.CronExpressionParser.parse(cronExpression, options);
     return interval.next().toDate();
   } catch (err) {
     console.error(`Failed to parse cron expression "${cronExpression}":`, err);
