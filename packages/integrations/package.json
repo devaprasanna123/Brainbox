@@ -4,12 +4,19 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "googleapis": "^137.0.0",
+    "jsonwebtoken": "^9.0.2",
     "@brain-box-ai/database": "*",
     "@brain-box-ai/auth": "*"
   },

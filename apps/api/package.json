@@ -16,6 +16,7 @@
     "@brain-box-ai/integrations": "*",
     "@brain-box-ai/shared": "*",
     "@brain-box-ai/voice": "*",
+    "@brain-box-ai/worker": "*",
     "@brain-box-ai/workflow-engine": "*",
     "bullmq": "^5.8.2",
     "cors": "^2.8.5",
