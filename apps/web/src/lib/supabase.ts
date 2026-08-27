@@ -28,6 +28,13 @@ function validateSupabaseConfig(url: string, key: string) {
   }
 }
 
-validateSupabaseConfig(supabaseUrl, supabaseAnonKey);
+const isBuildTime = 
+  process.env.NEXT_PHASE === "phase-production-build" || 
+  (!process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_URL) ||
+  (process.env.NODE_ENV === "production" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes("your-project")));
+
+if (!isBuildTime) {
+  validateSupabaseConfig(supabaseUrl, supabaseAnonKey);
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
