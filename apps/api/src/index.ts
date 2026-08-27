@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3001;
 // ============================================================
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
     credentials: true,
   })
 );
@@ -1591,7 +1591,7 @@ const handleGoogleCallback = async (req: Request, res: Response) => {
   if (error) {
     log("OAUTH_CALLBACK_DENIED", { error });
     return res.redirect(
-      `${process.env.FRONTEND_URL || "http://localhost:3000"}/settings?tab=integrations&error=access_denied`
+      `${process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")}/settings?tab=integrations&error=access_denied`
     );
   }
 
@@ -1640,7 +1640,7 @@ const handleGoogleCallback = async (req: Request, res: Response) => {
     });
 
     const redirectUrl = `${
-      process.env.FRONTEND_URL || "http://localhost:3000"
+      process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
     }/settings?tab=integrations&connected=google`;
     res.redirect(redirectUrl);
   } catch (err: any) {
@@ -2068,11 +2068,15 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     }
   }
 
-  app.listen(PORT, () => {
-    const primary = process.env.OPENROUTER_API_KEY ? `OpenRouter (${process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"})` : process.env.GEMINI_API_KEY ? "Gemini" : "None";
-    const fallback = (process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) ? "Gemini" : "None";
-    console.log(`🚀 Brain Box API running at http://localhost:${PORT}`);
-    console.log(`   [AI] Primary provider: ${primary}`);
-    console.log(`   [AI] Fallback provider: ${fallback}`);
-  });
+  if (process.env.VERCEL !== "1") {
+    app.listen(PORT, () => {
+      const primary = process.env.OPENROUTER_API_KEY ? `OpenRouter (${process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"})` : process.env.GEMINI_API_KEY ? "Gemini" : "None";
+      const fallback = (process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) ? "Gemini" : "None";
+      console.log(`🚀 Brain Box API running at http://localhost:${PORT}`);
+      console.log(`   [AI] Primary provider: ${primary}`);
+      console.log(`   [AI] Fallback provider: ${fallback}`);
+    });
+  }
 })();
+
+export default app;

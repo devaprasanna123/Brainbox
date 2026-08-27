@@ -23,7 +23,7 @@ const PORT = process.env.PORT || 3001;
 // CORS
 // ============================================================
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
     credentials: true,
 }));
 app.use(express_1.default.json());
@@ -1434,7 +1434,7 @@ const handleGoogleCallback = async (req, res) => {
     const error = req.query.error;
     if (error) {
         log("OAUTH_CALLBACK_DENIED", { error });
-        return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/settings?tab=integrations&error=access_denied`);
+        return res.redirect(`${process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")}/settings?tab=integrations&error=access_denied`);
     }
     if (!code || !state) {
         return res.status(400).send("Missing code or state parameter.");
@@ -1475,7 +1475,7 @@ const handleGoogleCallback = async (req, res) => {
             gmailAvailable: capabilityStatus.gmail.available,
             calendarAvailable: capabilityStatus.calendar.available,
         });
-        const redirectUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/settings?tab=integrations&connected=google`;
+        const redirectUrl = `${process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")}/settings?tab=integrations&connected=google`;
         res.redirect(redirectUrl);
     }
     catch (err) {
@@ -1866,12 +1866,15 @@ app.use((err, req, res, next) => {
             throw new Error(`[OAUTH CONFIG ERROR] Configured GOOGLE_REDIRECT_URI (${gConfig.redirectUri}) does not match generated client redirect URI (${generatedRedirectUri}).`);
         }
     }
-    app.listen(PORT, () => {
-        const primary = process.env.OPENROUTER_API_KEY ? `OpenRouter (${process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"})` : process.env.GEMINI_API_KEY ? "Gemini" : "None";
-        const fallback = (process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) ? "Gemini" : "None";
-        console.log(`🚀 Brain Box API running at http://localhost:${PORT}`);
-        console.log(`   [AI] Primary provider: ${primary}`);
-        console.log(`   [AI] Fallback provider: ${fallback}`);
-    });
+    if (process.env.VERCEL !== "1") {
+        app.listen(PORT, () => {
+            const primary = process.env.OPENROUTER_API_KEY ? `OpenRouter (${process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini"})` : process.env.GEMINI_API_KEY ? "Gemini" : "None";
+            const fallback = (process.env.OPENROUTER_API_KEY && process.env.GEMINI_API_KEY) ? "Gemini" : "None";
+            console.log(`🚀 Brain Box API running at http://localhost:${PORT}`);
+            console.log(`   [AI] Primary provider: ${primary}`);
+            console.log(`   [AI] Fallback provider: ${fallback}`);
+        });
+    }
 })();
+exports.default = app;
 //# sourceMappingURL=index.js.map

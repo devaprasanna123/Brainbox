@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w @brain-box-ai/web\" \"npm run dev -w @brain-box-ai/api\" \"npm run dev -w @brain-box-ai/worker\"",
-    "build": "npm run build --workspaces --if-present",
+    "build:packages": "npm run build -w @brain-box-ai/shared && npm run build -w @brain-box-ai/auth && npm run build -w @brain-box-ai/database && npm run build -w @brain-box-ai/ai && npm run build -w @brain-box-ai/voice && npm run build -w @brain-box-ai/workflow-engine && npm run build -w @brain-box-ai/integrations",
+    "build": "npm run build:packages && npm run build -w @brain-box-ai/api -w @brain-box-ai/worker -w @brain-box-ai/web",
     "test": "node scripts/run_tests.js",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

@@ -83,7 +83,8 @@ export const REQUIRED_GOOGLE_SCOPES = [
 ];
 
 export function getGoogleOAuth2Client() {
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/api/integrations/google/callback";
+  const baseUrl = process.env.API_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/integrations/google/callback`;
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID || "",
     process.env.GOOGLE_CLIENT_SECRET || "",
@@ -99,7 +100,8 @@ export function validateOAuthConfiguration(): {
 } {
   const clientId = process.env.GOOGLE_CLIENT_ID || "";
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3001/api/integrations/google/callback";
+  const baseUrl = process.env.API_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/integrations/google/callback`;
   const projectId = process.env.GOOGLE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT_ID || (clientId ? clientId.split("-")[0] : "412264053150");
 
   const suffix = clientId.length > 6 ? clientId.slice(-6) : "****";
