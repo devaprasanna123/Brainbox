@@ -21,7 +21,8 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "your-service-role-key";
 function validateSupabaseConfig(url, key) {
     if (!url || !key || url.includes("your-project") || key.includes("your-anon-key")) {
-        throw new Error("Supabase client configuration is invalid.");
+        console.warn("⚠️ [SUPABASE CONFIG] Supabase credentials not fully configured.");
+        return false;
     }
     try {
         const parsedUrl = new URL(url);
@@ -29,16 +30,20 @@ function validateSupabaseConfig(url, key) {
         const urlRef = hostParts[0];
         const parts = key.split(".");
         if (parts.length !== 3) {
-            throw new Error("Invalid JWT format");
+            console.warn("⚠️ [SUPABASE CONFIG] Invalid Supabase key JWT format.");
+            return false;
         }
         const payloadStr = Buffer.from(parts[1], "base64").toString("utf8");
         const payload = JSON.parse(payloadStr);
         if (payload.ref !== urlRef) {
-            throw new Error("Project ref mismatch");
+            console.warn("⚠️ [SUPABASE CONFIG] Supabase project ref mismatch.");
+            return false;
         }
+        return true;
     }
     catch (err) {
-        throw new Error("Supabase client configuration is invalid.");
+        console.warn("⚠️ [SUPABASE CONFIG] Supabase client configuration is invalid.");
+        return false;
     }
 }
 validateSupabaseConfig(supabaseUrl, supabaseAnonKey);

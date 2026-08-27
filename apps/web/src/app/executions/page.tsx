@@ -31,7 +31,7 @@ export default function ExecutionsPage() {
 
   const getHeaders = () => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") || "" : ""}`,
   });
 
   const [sessionRestored, setSessionRestored] = useState(false);
