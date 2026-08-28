@@ -22,7 +22,7 @@
   "dependencies": {
     "cron-parser": "^5.10.0",
     "glob": "^13.0.6",
-    "multer": "^2.2.0",
+    "multer": "^1.4.5-lts.1",
     "node-domexception": "^2.0.2",
     "uuid": "^14.0.2"
   }

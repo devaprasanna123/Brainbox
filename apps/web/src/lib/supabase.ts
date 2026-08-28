@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { auth } from "./firebase";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://your-project.supabase.co";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "your-anon-key";
@@ -37,4 +38,19 @@ if (!isBuildTime) {
   validateSupabaseConfig(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+  accessToken: async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return null;
+      return await currentUser.getIdToken(false);
+    } catch (e) {
+      console.error("[SUPABASE_ACCESS_TOKEN_ERROR]", e);
+      return null;
+    }
+  },
+});

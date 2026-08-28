@@ -485,7 +485,12 @@ export default function ChatPage() {
         console.log("[CHAT_ABORTED] Request aborted.");
         return;
       }
-      const isNetworkOffline = err instanceof TypeError || err.message === "Failed to fetch" || err.message === "NetworkError when attempting to fetch resource.";
+      const isNetworkOffline =
+        (err instanceof TypeError &&
+          (err.message === "Failed to fetch" ||
+            err.message === "NetworkError when attempting to fetch resource." ||
+            err.message === "Load failed")) ||
+        (typeof window !== "undefined" && !window.navigator.onLine);
       const isTimeout = err.name === "AbortError" || (err.message || "").toLowerCase().includes("timeout");
 
       setMessages((prev) => [
